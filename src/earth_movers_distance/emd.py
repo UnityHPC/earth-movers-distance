@@ -3,11 +3,9 @@ import numpy as np
 
 MAX_DIM = 4
 
-def l2_update(phi: cp.ndarray, m: cp.ndarray, m_temp: cp.ndarray, rhodiff: cp.ndarray, tau=3, mu=3e-6, dx = None):
+def l2_update(phi: cp.ndarray, m: cp.ndarray, m_temp: cp.ndarray, rhodiff: cp.ndarray, tau, mu, dx, dim):
     """Do an L2 update."""
 
-    if dx is None: dx = 1./phi.shape[0]
-    dim = len(phi.shape)
     m_temp[:] = -m
     m[0, :-1] += mu * (phi[1:] - phi[:-1]) / dx
     if dim > 1:
@@ -30,7 +28,7 @@ def l2_update(phi: cp.ndarray, m: cp.ndarray, m_temp: cp.ndarray, rhodiff: cp.nd
     
     phi += tau * (divergence/dx + rhodiff)
 
-def l2_distance(source: np.ndarray, dest: np.ndarray, maxiter=100, tau=3, mu=None, **kwargs):
+def l2_distance(source: np.ndarray, dest: np.ndarray, dx, maxiter=100000, tau=3, mu=3e-6):
     """Compute L2 earth mover's distance between two N-dimensional arrays."""
 
     if len(source.shape) > MAX_DIM:
@@ -38,14 +36,16 @@ def l2_distance(source: np.ndarray, dest: np.ndarray, maxiter=100, tau=3, mu=Non
     elif source.shape != dest.shape:
         raise ValueError(f"Dimension mismatch between source and destination! Source shape is '{source.shape}', dest shape is '{dest.shape}'.")
     rhodiff = cp.array(dest-source)
-    if mu is None: mu = 1./(tau*16*rhodiff.size)
     phi = cp.zeros_like(rhodiff)
     m = cp.zeros((len(phi.shape),) + phi.shape)
     m_temp = cp.zeros_like(m)
+    dim = len(phi.shape)
+    print(tau, mu, dx, dim)
     for i in range(maxiter):
-        l2_update(phi, m, m_temp, rhodiff, **kwargs)
+        l2_update(phi, m, m_temp, rhodiff, tau=tau, mu=mu, dx=dx, dim=dim)
         if i %1000 == 0:
             print(f"Iteration: {i}, L2 distance", cp.sum(cp.sqrt(cp.sum(m**2,axis=0))))
+    return cp.sum(cp.sqrt(cp.sum(m**2,axis=0)))
 
 if __name__ == "__main__":
     N = 256 
